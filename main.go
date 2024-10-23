@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"Server/Controllers"
@@ -49,7 +50,10 @@ func main() {
 
 	router.StaticFS("/uploads", http.Dir("./uploads"))
 
-	port := "8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	fmt.Printf("Server running at http://localhost:%s\n", port)
 	log.Fatal(router.Run(":" + port))
 }
