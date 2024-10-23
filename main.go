@@ -35,6 +35,7 @@ func uploadToCloudinary(file multipart.File, fileName string) (string, error) {
 }
 
 func main() {
+	// MongoDB connection setup
 	clientOptions := options.Client().ApplyURI("mongodb+srv://NHATANH:WMGaAVaGCtsPnC1k@cluster0.6z5yhqo.mongodb.net/golangproject")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -92,6 +93,8 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	fmt.Printf("Server running at http://localhost:%s\n", port)
-	log.Fatal(router.Run(":" + port))
+
+	// Listen on 0.0.0.0 to allow access from external requests
+	fmt.Printf("Server running at http://0.0.0.0:%s\n", port)
+	log.Fatal(router.Run("0.0.0.0:" + port))
 }
