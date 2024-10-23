@@ -2,18 +2,32 @@ package Controllers
 
 import (
 	"context"
+	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 
 	"Server/Middleware"
 	"Server/Models"
 
+	"github.com/cloudinary/cloudinary-go"
+	"github.com/cloudinary/cloudinary-go/api/uploader"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+func uploadToCloudinary(file multipart.File, fileName string) (string, error) {
+	cld, err := cloudinary.NewFromParams("dflhancsp", "437865386617669", "uLJSc-9ItdeXSbWyEndQ3x-F1FY")
+	if err != nil {
+		return "", err
+	}
+	ctx := context.Background()
+	uploadResult, err := cld.Upload.Upload(ctx, file, uploader.UploadParams{PublicID: fileName})
+	if err != nil {
+		return "", err
+	}
+	return uploadResult.SecureURL, nil
+}
 
 func CreateProduct(c *gin.Context) {
 	claims := c.MustGet("user").(*Middleware.UserClaims)
@@ -37,19 +51,20 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
-	uploadPath := filepath.Join("uploads", "images")
-	if err := os.MkdirAll(uploadPath, os.ModePerm); err != nil {
-		c.JSON(500, gin.H{"error": "Could not create upload directory"})
+	fileContent, err := file.Open()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Could not open file"})
+		return
+	}
+	defer fileContent.Close()
+
+	url, err := uploadToCloudinary(fileContent, file.Filename)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Could not upload image to Cloudinary"})
 		return
 	}
 
-	filePath := filepath.Join(uploadPath, file.Filename)
-	if err := c.SaveUploadedFile(file, filePath); err != nil {
-		c.JSON(500, gin.H{"error": "Could not save file"})
-		return
-	}
-
-	product.ImageURL = filepath.ToSlash(filepath.Join("uploads/images", file.Filename))
+	product.ImageURL = url
 	product.Name = c.PostForm("name")
 	product.Price, _ = strconv.ParseFloat(c.PostForm("price"), 64)
 	product.Stock, _ = strconv.Atoi(c.PostForm("stock"))
@@ -139,21 +154,20 @@ func UpdateProduct(c *gin.Context) {
 
 	file, err := c.FormFile("image")
 	if err == nil {
-		uploadPath := filepath.Join("uploads", "images")
-		err = os.MkdirAll(uploadPath, os.ModePerm)
+		fileContent, err := file.Open()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create upload directory"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not open file"})
+			return
+		}
+		defer fileContent.Close()
+
+		url, err := uploadToCloudinary(fileContent, file.Filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not upload image to Cloudinary"})
 			return
 		}
 
-		filePath := filepath.Join(uploadPath, file.Filename)
-		err = c.SaveUploadedFile(file, filePath)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save file"})
-			return
-		}
-
-		existingProduct.ImageURL = filepath.ToSlash(filepath.Join("uploads/images", file.Filename))
+		existingProduct.ImageURL = url
 	}
 
 	if name := c.PostForm("name"); name != "" {

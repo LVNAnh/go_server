@@ -3,8 +3,6 @@ package Controllers
 import (
 	"context"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 
 	"Server/Middleware"
@@ -32,16 +30,20 @@ func CreateService(c *gin.Context) {
 
 	file, err := c.FormFile("image")
 	if err == nil {
-		uploadPath := filepath.Join("uploads", "images")
-		os.MkdirAll(uploadPath, os.ModePerm)
-
-		filePath := filepath.Join(uploadPath, file.Filename)
-		err = c.SaveUploadedFile(file, filePath)
+		fileContent, err := file.Open()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save file"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not open file"})
 			return
 		}
-		service.ImageURL = filepath.ToSlash(filepath.Join("uploads/images", file.Filename))
+		defer fileContent.Close()
+
+		// Upload to Cloudinary
+		url, err := uploadToCloudinary(fileContent, file.Filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not upload image to Cloudinary"})
+			return
+		}
+		service.ImageURL = url
 	}
 
 	service.Name = c.PostForm("name")
@@ -134,16 +136,20 @@ func UpdateService(c *gin.Context) {
 
 	file, err := c.FormFile("image")
 	if err == nil {
-		uploadPath := filepath.Join("uploads", "images")
-		os.MkdirAll(uploadPath, os.ModePerm)
-
-		filePath := filepath.Join(uploadPath, file.Filename)
-		err = c.SaveUploadedFile(file, filePath)
+		fileContent, err := file.Open()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save file"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not open file"})
 			return
 		}
-		existingService.ImageURL = filePath
+		defer fileContent.Close()
+
+		// Upload to Cloudinary
+		url, err := uploadToCloudinary(fileContent, file.Filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not upload image to Cloudinary"})
+			return
+		}
+		existingService.ImageURL = url
 	}
 
 	if name := c.PostForm("name"); name != "" {
