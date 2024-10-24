@@ -64,7 +64,6 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Lấy đường dẫn tuyệt đối tới thư mục build
 	staticPath, err := filepath.Abs("../Client/build/static")
 	if err != nil {
 		log.Fatal("Could not find static folder:", err)
@@ -74,10 +73,8 @@ func main() {
 		log.Fatal("Could not find index.html:", err)
 	}
 
-	// Phục vụ các file tĩnh
 	router.Static("/static", staticPath)
 
-	// Phục vụ index.html cho các route không phải API
 	router.NoRoute(func(c *gin.Context) {
 		c.File(indexPath)
 	})
