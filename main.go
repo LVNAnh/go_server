@@ -63,6 +63,14 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Serve static files
+	router.Static("/static", "./client/build/static")
+
+	// Serve the index.html on any route that doesn't match API routes
+	router.NoRoute(func(c *gin.Context) {
+		c.File("./client/build/index.html")
+	})
+
 	router.POST("/upload", func(c *gin.Context) {
 		file, err := c.FormFile("image")
 		if err != nil {
@@ -93,7 +101,6 @@ func main() {
 		port = "8080"
 	}
 
-	// Listen on 0.0.0.0 to allow access from external requests
 	fmt.Printf("Server running at http://0.0.0.0:%s\n", port)
 	log.Fatal(router.Run("0.0.0.0:" + port))
 }
