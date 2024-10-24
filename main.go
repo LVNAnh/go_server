@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"Server/Controllers"
@@ -63,10 +64,22 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	router.Static("/static", "./client/build/static")
+	// Lấy đường dẫn tuyệt đối tới thư mục build
+	staticPath, err := filepath.Abs("../Client/build/static")
+	if err != nil {
+		log.Fatal("Could not find static folder:", err)
+	}
+	indexPath, err := filepath.Abs("../Client/build/index.html")
+	if err != nil {
+		log.Fatal("Could not find index.html:", err)
+	}
 
+	// Phục vụ các file tĩnh
+	router.Static("/static", staticPath)
+
+	// Phục vụ index.html cho các route không phải API
 	router.NoRoute(func(c *gin.Context) {
-		c.File("./client/build/index.html")
+		c.File(indexPath)
 	})
 
 	router.POST("/upload", func(c *gin.Context) {
