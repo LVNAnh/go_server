@@ -68,6 +68,7 @@ func SetupRoutes(router *gin.Engine) {
 		// OrderBookingService routes
 		api.POST("/orderbookingservice", Middleware.AuthMiddleware(Middleware.Customer), Controllers.CreateOrderBookingService)
 		api.GET("/orderbookingservices", Middleware.AuthMiddleware(Middleware.Customer), Controllers.GetOrderBookingServices)
+		api.GET("/orderbookingservices/all", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetAllOrderBookingServices)
 		api.PATCH("/orderbookingservice/:id/status", Middleware.AuthMiddleware(Middleware.Admin), Controllers.UpdateOrderBookingServiceStatus)
 	}
 }

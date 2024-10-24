@@ -75,6 +75,25 @@ func GetOrderBookingServices(c *gin.Context) {
 	c.JSON(200, orderBookings)
 }
 
+func GetAllOrderBookingServices(c *gin.Context) {
+	orderBookingCollection := getOrderBookingServiceCollection()
+	var orderBookings []Models.OrderBookingService
+
+	cursor, err := orderBookingCollection.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to get all order bookings"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	if err := cursor.All(context.Background(), &orderBookings); err != nil {
+		c.JSON(500, gin.H{"error": "Failed to decode order bookings"})
+		return
+	}
+
+	c.JSON(200, orderBookings)
+}
+
 func UpdateOrderBookingServiceStatus(c *gin.Context) {
 	orderID := c.Param("id")
 
