@@ -35,7 +35,6 @@ func uploadToCloudinary(file multipart.File, fileName string) (string, error) {
 }
 
 func main() {
-	// MongoDB connection setup
 	clientOptions := options.Client().ApplyURI("mongodb+srv://NHATANH:WMGaAVaGCtsPnC1k@cluster0.6z5yhqo.mongodb.net/golangproject")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -56,7 +55,7 @@ func main() {
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:6969"},
+		AllowOrigins:     []string{"https://cleeny.onrender.com"},
 		AllowMethods:     []string{"POST", "GET", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Authorization"},
