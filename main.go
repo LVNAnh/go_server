@@ -63,10 +63,8 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Serve static files
 	router.Static("/static", "./client/build/static")
 
-	// Serve the index.html on any route that doesn't match API routes
 	router.NoRoute(func(c *gin.Context) {
 		c.File("./client/build/index.html")
 	})
@@ -102,5 +100,5 @@ func main() {
 	}
 
 	fmt.Printf("Server running at http://0.0.0.0:%s\n", port)
-	log.Fatal(router.Run("0.0.0.0:" + port))
+	log.Fatal(router.Run(":" + port))
 }
