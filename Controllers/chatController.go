@@ -212,3 +212,29 @@ func GetNewChatRequests(c *gin.Context) {
 
 	c.JSON(http.StatusOK, chats)
 }
+
+func GetChatMessages(c *gin.Context) {
+	chatId := c.Param("chatId")
+	objectId, err := primitive.ObjectIDFromHex(chatId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		return
+	}
+
+	collection := Database.Collection("messages")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var messages []Models.Message
+	cursor, err := collection.Find(ctx, bson.M{"chat_id": objectId})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching messages"})
+		return
+	}
+	if err := cursor.All(ctx, &messages); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error parsing messages"})
+		return
+	}
+
+	c.JSON(http.StatusOK, messages)
+}
