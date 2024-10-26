@@ -36,7 +36,7 @@ func CreateChat(c *gin.Context) {
 	}
 
 	if chat.CustomerID == primitive.NilObjectID && (chat.GuestName == "" || chat.GuestPhone == "") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Guest name and phone required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Guest name and phone are required"})
 		return
 	}
 
@@ -50,8 +50,11 @@ func CreateChat(c *gin.Context) {
 	}}
 	var existingChat Models.SupportChat
 	err := collection.FindOne(ctx, filter).Decode(&existingChat)
-	if err != mongo.ErrNoDocuments {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Active chat already exists"})
+	if err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "An active chat already exists for this customer or guest"})
+		return
+	} else if err != mongo.ErrNoDocuments {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking existing chat"})
 		return
 	}
 
