@@ -31,11 +31,15 @@ var broadcast = make(chan Models.Message)
 func CreateChat(c *gin.Context) {
 	var chat Models.SupportChat
 	if err := c.ShouldBindJSON(&chat); err != nil {
+		log.Println("Error parsing request payload:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
+	log.Println("Received chat request:", chat.GuestName, chat.GuestPhone)
+
 	if chat.CustomerID == primitive.NilObjectID && (chat.GuestName == "" || chat.GuestPhone == "") {
+		log.Println("Missing guest name or phone")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Guest name and phone are required"})
 		return
 	}
@@ -51,9 +55,11 @@ func CreateChat(c *gin.Context) {
 	var existingChat Models.SupportChat
 	err := collection.FindOne(ctx, filter).Decode(&existingChat)
 	if err == nil {
+		log.Println("Active chat already exists for this guest or customer")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "An active chat already exists for this customer or guest"})
 		return
 	} else if err != mongo.ErrNoDocuments {
+		log.Println("Error checking existing chat:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking existing chat"})
 		return
 	}
@@ -65,10 +71,12 @@ func CreateChat(c *gin.Context) {
 
 	_, err = collection.InsertOne(ctx, chat)
 	if err != nil {
+		log.Println("Error inserting new chat:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating chat"})
 		return
 	}
 
+	log.Println("New chat created with ID:", chat.ID)
 	c.JSON(http.StatusOK, chat)
 }
 
