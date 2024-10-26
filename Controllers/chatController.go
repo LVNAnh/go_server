@@ -14,7 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var upgrader = websocket.Upgrader{
@@ -30,18 +29,13 @@ var broadcast = make(chan Models.Message)
 
 func CreateChat(c *gin.Context) {
 	var chat Models.SupportChat
-
-	if err := c.ShouldBind(&chat); err != nil {
-		log.Println("Error parsing request payload:", err)
+	if err := c.ShouldBindJSON(&chat); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
-	log.Println("Received guest name:", chat.GuestName)
-	log.Println("Received guest phone:", chat.GuestPhone)
-
+	// Kiểm tra khách hàng chưa đăng ký (Guest) có thông tin tên và số điện thoại
 	if chat.CustomerID == primitive.NilObjectID && (chat.GuestName == "" || chat.GuestPhone == "") {
-		log.Println("Missing guest name or phone")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Guest name and phone are required"})
 		return
 	}
@@ -50,6 +44,7 @@ func CreateChat(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Tìm nếu đã có chat hoạt động cho khách hàng hoặc Guest này
 	filter := bson.M{"$or": []bson.M{
 		{"customer_id": chat.CustomerID, "is_active": true},
 		{"guest_phone": chat.GuestPhone, "is_active": true},
@@ -57,15 +52,15 @@ func CreateChat(c *gin.Context) {
 	var existingChat Models.SupportChat
 	err := collection.FindOne(ctx, filter).Decode(&existingChat)
 	if err == nil {
-		log.Println("Active chat already exists for this guest or customer")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "An active chat already exists for this customer or guest"})
+		// Nếu đã có chat, trả về chat đó
+		c.JSON(http.StatusOK, existingChat)
 		return
 	} else if err != mongo.ErrNoDocuments {
-		log.Println("Error checking existing chat:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking existing chat"})
 		return
 	}
 
+	// Tạo chat mới nếu chưa có
 	chat.ID = primitive.NewObjectID()
 	chat.CreatedAt = time.Now()
 	chat.UpdatedAt = time.Now()
@@ -73,12 +68,10 @@ func CreateChat(c *gin.Context) {
 
 	_, err = collection.InsertOne(ctx, chat)
 	if err != nil {
-		log.Println("Error inserting new chat:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating chat"})
 		return
 	}
 
-	log.Println("New chat created with ID:", chat.ID)
 	c.JSON(http.StatusOK, chat)
 }
 
@@ -148,10 +141,29 @@ func ChatWebSocket(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	role := c.Query("role") // Retrieve the role (Admin or Guest) from query parameters
-	clients[conn] = role    // Map connection to role
+	chatId := c.Query("chatId")
+	role := c.Query("role") // Lấy vai trò (Admin hoặc Guest)
 
-	go handleMessages() // Start the message handler
+	// Kết nối WebSocket vào chat với chatId và vai trò
+	clients[conn] = role
+
+	if role == "Admin" {
+		// Cập nhật admin_id trong document của chat trong MongoDB
+		collection := Database.Collection("chats")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		chatObjectID, _ := primitive.ObjectIDFromHex(chatId)
+		update := bson.M{"$set": bson.M{"admin_id": chatObjectID}}
+		_, err := collection.UpdateOne(ctx, bson.M{"_id": chatObjectID}, update)
+		if err != nil {
+			log.Println("Error updating admin_id:", err)
+			return
+		}
+	}
+
+	// Khởi động việc xử lý tin nhắn giữa Guest và Admin
+	go handleMessages()
 
 	for {
 		var msg Models.Message
@@ -163,7 +175,7 @@ func ChatWebSocket(c *gin.Context) {
 		}
 
 		msg.Timestamp = time.Now()
-		broadcast <- msg // Send message to broadcast channel
+		broadcast <- msg
 	}
 }
 
@@ -188,19 +200,19 @@ func GetNewChatRequests(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var chats []Models.SupportChat
-	options := options.Find().SetSort(bson.D{{"created_at", -1}})
-	cursor, err := collection.Find(ctx, bson.M{"is_active": true, "customer_id": primitive.NilObjectID}, options)
+	filter := bson.M{"is_active": true, "admin_id": primitive.NilObjectID}
+	var chatRequests []Models.SupportChat
+	cursor, err := collection.Find(ctx, filter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching chats"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching chat requests"})
 		return
 	}
-	if err := cursor.All(ctx, &chats); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error parsing chats"})
+	if err := cursor.All(ctx, &chatRequests); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error decoding chat requests"})
 		return
 	}
 
-	c.JSON(http.StatusOK, chats)
+	c.JSON(http.StatusOK, chatRequests)
 }
 
 func GetChatMessages(c *gin.Context) {
