@@ -25,6 +25,8 @@ type User struct {
 	Role      Role               `json:"role,omitempty"`
 	Avatar    string             `json:"avatar,omitempty"`
 	Cart      Cart               `json:"cart,omitempty"`
+	IsOnline  bool               `bson:"is_online" json:"is_online"`
+	LastSeen  time.Time          `bson:"last_seen" json:"last_seen"`
 }
 
 type Cart struct {

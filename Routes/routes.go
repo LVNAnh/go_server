@@ -70,5 +70,10 @@ func SetupRoutes(router *gin.Engine) {
 		api.GET("/orderbookingservices", Middleware.AuthMiddleware(Middleware.Customer), Controllers.GetOrderBookingServices)
 		api.GET("/orderbookingservices/all", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetAllOrderBookingServices)
 		api.PATCH("/orderbookingservice/:id/status", Middleware.AuthMiddleware(Middleware.Admin), Controllers.UpdateOrderBookingServiceStatus)
+
+		// Chat routes
+		api.POST("/create-chat", Controllers.CreateChat)
+		api.POST("/reply-chat", Middleware.AuthMiddleware(Middleware.Admin), Controllers.ReplyChat)
+		api.GET("/ws/chat", Controllers.ChatWebSocket)
 	}
 }
