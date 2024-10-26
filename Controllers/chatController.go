@@ -2,6 +2,7 @@ package Controllers
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -23,6 +24,9 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+var clients = make(map[*websocket.Conn]bool)
+var broadcast = make(chan Models.Message)
 
 func CreateChat(c *gin.Context) {
 	var chat Models.SupportChat
@@ -125,16 +129,21 @@ func GetAllChatsAndMessages(c *gin.Context) {
 func ChatWebSocket(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Println("Failed to set websocket upgrade: ", err)
+		log.Println("Failed to set websocket upgrade:", err)
 		return
 	}
 	defer conn.Close()
+
+	clients[conn] = true
+
+	go handleMessages()
 
 	for {
 		var msg Models.Message
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			log.Println("Error reading json: ", err)
+			log.Printf("error: %v", err)
+			delete(clients, conn)
 			break
 		}
 
@@ -147,9 +156,25 @@ func ChatWebSocket(c *gin.Context) {
 
 		_, err = collection.InsertOne(ctx, msg)
 		if err != nil {
-			log.Println("Error inserting message: ", err)
+			log.Println("Error inserting message:", err)
 			break
 		}
 
+		broadcast <- msg
+	}
+}
+
+func handleMessages() {
+	for {
+		msg := <-broadcast
+		messageJSON, _ := json.Marshal(msg)
+		for client := range clients {
+			err := client.WriteMessage(websocket.TextMessage, messageJSON)
+			if err != nil {
+				log.Printf("WebSocket error: %v", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
 	}
 }
