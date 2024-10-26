@@ -56,7 +56,7 @@ func main() {
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://cleeny.onrender.com"},
+		AllowOrigins:     []string{"https://cleeny.onrender.com", "wss://go-server-9p6w.onrender.com"},
 		AllowMethods:     []string{"POST", "GET", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Authorization"},
