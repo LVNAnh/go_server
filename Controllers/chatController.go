@@ -36,10 +36,10 @@ func CreateChat(c *gin.Context) {
 		return
 	}
 
-	log.Println("Received chat request:", chat.GuestName, chat.GuestPhone)
+	log.Println("Received guest name:", chat.GuestName)
+	log.Println("Received guest phone:", chat.GuestPhone)
 
 	if chat.CustomerID == primitive.NilObjectID && (chat.GuestName == "" || chat.GuestPhone == "") {
-		log.Println("Missing guest name or phone")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Guest name and phone are required"})
 		return
 	}
