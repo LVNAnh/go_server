@@ -6,11 +6,14 @@ import (
 	"net/http"
 	"time"
 
+	"Server/Middleware"
 	"Server/Models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var upgrader = websocket.Upgrader{
@@ -28,16 +31,32 @@ func CreateChat(c *gin.Context) {
 		return
 	}
 
-	chat.ID = primitive.NewObjectID()
-	chat.CreatedAt = time.Now()
-	chat.UpdatedAt = time.Now()
-	chat.IsActive = true
+	if chat.CustomerID == primitive.NilObjectID && (chat.GuestName == "" || chat.GuestPhone == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Guest name and phone required"})
+		return
+	}
 
 	collection := Database.Collection("chats")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := collection.InsertOne(ctx, chat)
+	filter := bson.M{"$or": []bson.M{
+		{"customer_id": chat.CustomerID, "is_active": true},
+		{"guest_phone": chat.GuestPhone, "is_active": true},
+	}}
+	var existingChat Models.SupportChat
+	err := collection.FindOne(ctx, filter).Decode(&existingChat)
+	if err != mongo.ErrNoDocuments {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Active chat already exists"})
+		return
+	}
+
+	chat.ID = primitive.NewObjectID()
+	chat.CreatedAt = time.Now()
+	chat.UpdatedAt = time.Now()
+	chat.IsActive = true
+
+	_, err = collection.InsertOne(ctx, chat)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating chat"})
 		return
@@ -50,6 +69,14 @@ func ReplyChat(c *gin.Context) {
 	var msg Models.Message
 	if err := c.ShouldBindJSON(&msg); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	user, _ := c.Get("user")
+	claims := user.(*Middleware.UserClaims)
+
+	if claims.Role != 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admin can reply"})
 		return
 	}
 
@@ -69,6 +96,32 @@ func ReplyChat(c *gin.Context) {
 	c.JSON(http.StatusOK, msg)
 }
 
+func GetAllChatsAndMessages(c *gin.Context) {
+	user, _ := c.Get("user")
+	claims := user.(*Middleware.UserClaims)
+	if claims.Role != 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	collection := Database.Collection("chats")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var chats []Models.SupportChat
+	cursor, err := collection.Find(ctx, bson.M{"customer_id": primitive.NilObjectID, "is_active": true})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching chats"})
+		return
+	}
+	if err := cursor.All(ctx, &chats); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error parsing chats"})
+		return
+	}
+
+	c.JSON(http.StatusOK, chats)
+}
+
 func ChatWebSocket(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -85,7 +138,6 @@ func ChatWebSocket(c *gin.Context) {
 			break
 		}
 
-		// Handle the message (e.g., save to database, broadcast to other users)
 		msg.ID = primitive.NewObjectID()
 		msg.Timestamp = time.Now()
 
@@ -99,6 +151,5 @@ func ChatWebSocket(c *gin.Context) {
 			break
 		}
 
-		// Broadcast the message to other users (this part will depend on your implementation)
 	}
 }

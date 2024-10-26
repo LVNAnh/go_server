@@ -75,5 +75,6 @@ func SetupRoutes(router *gin.Engine) {
 		api.POST("/create-chat", Controllers.CreateChat)
 		api.POST("/reply-chat", Middleware.AuthMiddleware(Middleware.Admin), Controllers.ReplyChat)
 		api.GET("/ws/chat", Controllers.ChatWebSocket)
+		api.GET("/admin/chats", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetAllChatsAndMessages)
 	}
 }

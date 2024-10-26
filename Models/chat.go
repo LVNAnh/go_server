@@ -10,6 +10,8 @@ type SupportChat struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	CustomerID primitive.ObjectID `bson:"customer_id,omitempty" json:"customer_id,omitempty"`
 	GuestID    string             `bson:"guest_id,omitempty" json:"guest_id,omitempty"`
+	GuestName  string             `bson:"guest_name,omitempty" json:"guest_name,omitempty"`   // Added
+	GuestPhone string             `bson:"guest_phone,omitempty" json:"guest_phone,omitempty"` // Added
 	AdminID    primitive.ObjectID `bson:"admin_id" json:"admin_id"`
 	Messages   []Message          `bson:"messages" json:"messages"`
 	IsActive   bool               `bson:"is_active" json:"is_active"`
