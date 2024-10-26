@@ -76,7 +76,7 @@ func SetupRoutes(router *gin.Engine) {
 		api.POST("/reply-chat", Middleware.AuthMiddleware(Middleware.Admin), Controllers.ReplyChat)
 		api.GET("/ws/chat", Controllers.ChatWebSocket)
 		api.GET("/admin/chats", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetAllChatsAndMessages)
-		api.GET("/admin/notifications", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetNewChatRequests) // Route mới
+		api.GET("/admin/notifications", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetNewChatRequests)
 		api.GET("/api/chat/:chatId/messages", Controllers.GetChatMessages)
 	}
 }

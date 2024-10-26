@@ -101,11 +101,12 @@ func ReplyChat(c *gin.Context) {
 	msg.ID = primitive.NewObjectID()
 	msg.Timestamp = time.Now()
 
-	collection := Database.Collection("messages")
+	collection := Database.Collection("chats")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := collection.InsertOne(ctx, msg)
+	update := bson.M{"$push": bson.M{"messages": msg}}
+	_, err := collection.UpdateOne(ctx, bson.M{"_id": msg.ChatID}, update)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error sending message"})
 		return
