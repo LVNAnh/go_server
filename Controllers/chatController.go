@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var upgrader = websocket.Upgrader{
@@ -148,6 +149,7 @@ func ChatWebSocket(c *gin.Context) {
 	defer conn.Close()
 
 	clients[conn] = true
+	defer delete(clients, conn)
 
 	go handleMessages()
 
@@ -156,7 +158,6 @@ func ChatWebSocket(c *gin.Context) {
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			log.Printf("error: %v", err)
-			delete(clients, conn)
 			break
 		}
 
@@ -190,4 +191,24 @@ func handleMessages() {
 			}
 		}
 	}
+}
+
+func GetNewChatRequests(c *gin.Context) {
+	collection := Database.Collection("chats")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var chats []Models.SupportChat
+	options := options.Find().SetSort(bson.D{{"created_at", -1}})
+	cursor, err := collection.Find(ctx, bson.M{"is_active": true, "customer_id": primitive.NilObjectID}, options)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching chats"})
+		return
+	}
+	if err := cursor.All(ctx, &chats); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error parsing chats"})
+		return
+	}
+
+	c.JSON(http.StatusOK, chats)
 }
