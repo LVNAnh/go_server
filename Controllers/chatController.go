@@ -34,7 +34,6 @@ func CreateChat(c *gin.Context) {
 		return
 	}
 
-	// Kiểm tra khách hàng chưa đăng ký (Guest) có thông tin tên và số điện thoại
 	if chat.CustomerID == primitive.NilObjectID && (chat.GuestName == "" || chat.GuestPhone == "") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Guest name and phone are required"})
 		return
@@ -44,7 +43,6 @@ func CreateChat(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Tìm nếu đã có chat hoạt động cho khách hàng hoặc Guest này
 	filter := bson.M{"$or": []bson.M{
 		{"customer_id": chat.CustomerID, "is_active": true},
 		{"guest_phone": chat.GuestPhone, "is_active": true},
@@ -52,7 +50,6 @@ func CreateChat(c *gin.Context) {
 	var existingChat Models.SupportChat
 	err := collection.FindOne(ctx, filter).Decode(&existingChat)
 	if err == nil {
-		// Nếu đã có chat, trả về chat đó
 		c.JSON(http.StatusOK, existingChat)
 		return
 	} else if err != mongo.ErrNoDocuments {
@@ -60,7 +57,6 @@ func CreateChat(c *gin.Context) {
 		return
 	}
 
-	// Tạo chat mới nếu chưa có
 	chat.ID = primitive.NewObjectID()
 	chat.CreatedAt = time.Now()
 	chat.UpdatedAt = time.Now()
@@ -142,13 +138,11 @@ func ChatWebSocket(c *gin.Context) {
 	defer conn.Close()
 
 	chatId := c.Query("chatId")
-	role := c.Query("role") // Lấy vai trò (Admin hoặc Guest)
+	role := c.Query("role")
 
-	// Kết nối WebSocket vào chat với chatId và vai trò
 	clients[conn] = role
 
 	if role == "Admin" {
-		// Cập nhật admin_id trong document của chat trong MongoDB
 		collection := Database.Collection("chats")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -162,7 +156,6 @@ func ChatWebSocket(c *gin.Context) {
 		}
 	}
 
-	// Khởi động việc xử lý tin nhắn giữa Guest và Admin
 	go handleMessages()
 
 	for {
@@ -181,9 +174,9 @@ func ChatWebSocket(c *gin.Context) {
 
 func handleMessages() {
 	for {
-		msg := <-broadcast // Get the latest message from the broadcast channel
+		msg := <-broadcast
 		for client, role := range clients {
-			if role != msg.SenderRole { // Send only to opposite role (Admin or Guest)
+			if role != msg.SenderRole {
 				err := client.WriteJSON(msg)
 				if err != nil {
 					log.Printf("WebSocket error: %v", err)
@@ -239,4 +232,26 @@ func GetChatMessages(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, messages)
+}
+
+func GetChatInfo(c *gin.Context) {
+	chatId := c.Param("chatId")
+	objectId, err := primitive.ObjectIDFromHex(chatId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		return
+	}
+
+	collection := Database.Collection("chats")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var chat Models.SupportChat
+	err = collection.FindOne(ctx, bson.M{"_id": objectId}).Decode(&chat)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Chat not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"guest_name": chat.GuestName})
 }

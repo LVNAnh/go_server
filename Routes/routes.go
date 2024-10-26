@@ -78,5 +78,6 @@ func SetupRoutes(router *gin.Engine) {
 		api.GET("/admin/chats", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetAllChatsAndMessages)
 		api.GET("/admin/notifications", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetNewChatRequests)
 		api.GET("/api/chat/:chatId/messages", Controllers.GetChatMessages)
+		api.GET("/api/chat/:chatId/info", Controllers.GetChatInfo)
 	}
 }
