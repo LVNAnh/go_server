@@ -2,7 +2,6 @@ package Controllers
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -26,7 +25,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-var clients = make(map[*websocket.Conn]bool)
+var clients = make(map[*websocket.Conn]string)
 var broadcast = make(chan Models.Message)
 
 func CreateChat(c *gin.Context) {
@@ -149,46 +148,36 @@ func ChatWebSocket(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	clients[conn] = true
-	defer delete(clients, conn)
+	role := c.Query("role") // Retrieve the role (Admin or Guest) from query parameters
+	clients[conn] = role    // Map connection to role
 
-	go handleMessages()
+	go handleMessages() // Start the message handler
 
 	for {
 		var msg Models.Message
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			log.Printf("error: %v", err)
+			delete(clients, conn)
 			break
 		}
 
-		msg.ID = primitive.NewObjectID()
 		msg.Timestamp = time.Now()
-
-		collection := Database.Collection("messages")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		_, err = collection.InsertOne(ctx, msg)
-		if err != nil {
-			log.Println("Error inserting message:", err)
-			break
-		}
-
-		broadcast <- msg
+		broadcast <- msg // Send message to broadcast channel
 	}
 }
 
 func handleMessages() {
 	for {
-		msg := <-broadcast
-		messageJSON, _ := json.Marshal(msg)
-		for client := range clients {
-			err := client.WriteMessage(websocket.TextMessage, messageJSON)
-			if err != nil {
-				log.Printf("WebSocket error: %v", err)
-				client.Close()
-				delete(clients, client)
+		msg := <-broadcast // Get the latest message from the broadcast channel
+		for client, role := range clients {
+			if role != msg.SenderRole { // Send only to opposite role (Admin or Guest)
+				err := client.WriteJSON(msg)
+				if err != nil {
+					log.Printf("WebSocket error: %v", err)
+					client.Close()
+					delete(clients, client)
+				}
 			}
 		}
 	}
