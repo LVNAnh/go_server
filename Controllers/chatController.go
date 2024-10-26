@@ -30,7 +30,8 @@ var broadcast = make(chan Models.Message)
 
 func CreateChat(c *gin.Context) {
 	var chat Models.SupportChat
-	if err := c.ShouldBindJSON(&chat); err != nil {
+
+	if err := c.ShouldBind(&chat); err != nil {
 		log.Println("Error parsing request payload:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
