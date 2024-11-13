@@ -2,6 +2,7 @@ package Controllers
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"Server/Middleware"
@@ -27,31 +28,31 @@ func CreateOrderBookingService(c *gin.Context) {
 
 	var orderBookingService Models.OrderBookingService
 	if err := c.ShouldBindJSON(&orderBookingService); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid input"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
 	serviceCollection := getServiceCollection()
 	var service Models.Service
 	if err := serviceCollection.FindOne(context.Background(), bson.M{"_id": orderBookingService.ServiceID}).Decode(&service); err != nil {
-		c.JSON(404, gin.H{"error": "Service not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Service not found"})
 		return
 	}
 
 	orderBookingService.UserID = userID
 	orderBookingService.TotalPrice = float64(orderBookingService.Quantity) * service.Price
-	orderBookingService.Status = "Chờ xác nhận"
+	orderBookingService.Status = "pending"
 	orderBookingService.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
 	orderBookingService.UpdatedAt = primitive.NewDateTimeFromTime(time.Now())
 	orderBookingService.BookingDate = primitive.NewDateTimeFromTime(time.Now())
 
 	orderBookingServiceCollection := getOrderBookingServiceCollection()
 	if _, err := orderBookingServiceCollection.InsertOne(context.Background(), orderBookingService); err != nil {
-		c.JSON(500, gin.H{"error": "Failed to create order booking service"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order booking service"})
 		return
 	}
 
-	c.JSON(200, orderBookingService)
+	c.JSON(http.StatusOK, orderBookingService)
 }
 
 func GetOrderBookingServices(c *gin.Context) {
@@ -62,17 +63,17 @@ func GetOrderBookingServices(c *gin.Context) {
 	var orderBookings []Models.OrderBookingService
 	cursor, err := orderBookingCollection.Find(context.Background(), bson.M{"user_id": userID})
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to get order bookings"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get order bookings"})
 		return
 	}
 	defer cursor.Close(context.Background())
 
 	if err := cursor.All(context.Background(), &orderBookings); err != nil {
-		c.JSON(500, gin.H{"error": "Failed to decode order bookings"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode order bookings"})
 		return
 	}
 
-	c.JSON(200, orderBookings)
+	c.JSON(http.StatusOK, orderBookings)
 }
 
 func GetAllOrderBookingServices(c *gin.Context) {
@@ -81,17 +82,17 @@ func GetAllOrderBookingServices(c *gin.Context) {
 
 	cursor, err := orderBookingCollection.Find(context.Background(), bson.M{})
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to get all order bookings"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get all order bookings"})
 		return
 	}
 	defer cursor.Close(context.Background())
 
 	if err := cursor.All(context.Background(), &orderBookings); err != nil {
-		c.JSON(500, gin.H{"error": "Failed to decode order bookings"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode order bookings"})
 		return
 	}
 
-	c.JSON(200, orderBookings)
+	c.JSON(http.StatusOK, orderBookings)
 }
 
 func UpdateOrderBookingServiceStatus(c *gin.Context) {
@@ -101,21 +102,32 @@ func UpdateOrderBookingServiceStatus(c *gin.Context) {
 		Status string `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&statusUpdate); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid input"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	if statusUpdate.Status != "Chờ xác nhận" && statusUpdate.Status != "Đã xác nhận" &&
-		statusUpdate.Status != "Đang tiến hành" && statusUpdate.Status != "Hoàn thành" &&
-		statusUpdate.Status != "Đã hủy" {
-		c.JSON(400, gin.H{"error": "Invalid status value"})
+	if statusUpdate.Status != "pending" && statusUpdate.Status != "confirmed" &&
+		statusUpdate.Status != "in-progress" && statusUpdate.Status != "completed" &&
+		statusUpdate.Status != "cancelled" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status value"})
 		return
 	}
 
 	orderBookingServiceCollection := getOrderBookingServiceCollection()
 	orderIDObj, err := primitive.ObjectIDFromHex(orderID)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid order ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order ID"})
+		return
+	}
+
+	var orderBookingService Models.OrderBookingService
+	if err := orderBookingServiceCollection.FindOne(context.Background(), bson.M{"_id": orderIDObj}).Decode(&orderBookingService); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		return
+	}
+
+	if orderBookingService.Status == "completed" || orderBookingService.Status == "cancelled" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot update a completed or cancelled order"})
 		return
 	}
 
@@ -127,9 +139,9 @@ func UpdateOrderBookingServiceStatus(c *gin.Context) {
 	}
 
 	if _, err := orderBookingServiceCollection.UpdateOne(context.Background(), bson.M{"_id": orderIDObj}, update); err != nil {
-		c.JSON(500, gin.H{"error": "Failed to update order status"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "Order status updated"})
+	c.JSON(http.StatusOK, gin.H{"message": "Order status updated"})
 }
