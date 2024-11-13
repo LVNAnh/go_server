@@ -55,7 +55,7 @@ func SetupRoutes(router *gin.Engine) {
 		// Order routes
 		api.POST("/order", Middleware.AuthMiddleware(Middleware.Customer), Controllers.CreateOrder)
 		api.GET("/orders", Middleware.AuthMiddleware(Middleware.Customer), Controllers.GetOrders)
-		api.DELETE("/order/:id", Middleware.AuthMiddleware(Middleware.Customer), Controllers.CancelOrder)
+		api.PATCH("/order/:id/status", Middleware.AuthMiddleware(Middleware.Admin), Controllers.UpdateOrderStatus)
 		api.GET("/order-management", Middleware.AuthMiddleware(Middleware.Admin), Controllers.GetAllOrders)
 
 		// SelectedItems routes

@@ -67,6 +67,7 @@ type Order struct {
 	User       User               `bson:"-" json:"user,omitempty"`
 	Items      []OrderItem        `bson:"items,omitempty" json:"items,omitempty"`
 	TotalPrice float64            `bson:"total_price,omitempty" json:"total_price,omitempty"`
+	Status     string             `bson:"status,omitempty" json:"status,omitempty"`
 	CreatedAt  time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
 	UpdatedAt  time.Time          `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 }

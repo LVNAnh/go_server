@@ -17,6 +17,7 @@ import (
 func getOrderCollection() *mongo.Collection {
 	return Database.Collection("product_order")
 }
+
 func getUserCollection() *mongo.Collection {
 	return Database.Collection("users")
 }
@@ -61,6 +62,7 @@ func CreateOrder(c *gin.Context) {
 		UserID:     userID,
 		Items:      orderItems,
 		TotalPrice: totalPrice,
+		Status:     "pending", // Trạng thái mặc định là pending
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -164,6 +166,46 @@ func GetAllOrders(c *gin.Context) {
 	c.JSON(http.StatusOK, orders)
 }
 
+func UpdateOrderStatus(c *gin.Context) {
+	orderID := c.Param("id")
+	var requestBody struct {
+		Status string `json:"status"`
+	}
+
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		return
+	}
+
+	objectID, err := primitive.ObjectIDFromHex(orderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order ID format"})
+		return
+	}
+
+	orderCollection := getOrderCollection()
+	var order Models.Order
+	err = orderCollection.FindOne(context.Background(), bson.M{"_id": objectID}).Decode(&order)
+	if err == mongo.ErrNoDocuments {
+		c.JSON(404, gin.H{"error": "Order not found"})
+		return
+	}
+
+	if order.Status == "completed" || order.Status == "cancelled" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Cannot update a completed or cancelled order"})
+		return
+	}
+
+	update := bson.M{"$set": bson.M{"status": requestBody.Status, "updatedAt": time.Now()}}
+	_, err = orderCollection.UpdateOne(context.Background(), bson.M{"_id": objectID}, update)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Order status updated successfully"})
+}
+
 func CancelOrder(c *gin.Context) {
 	claims := c.MustGet("user").(*Middleware.UserClaims)
 	orderID := c.Param("id")
@@ -187,7 +229,8 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
-	_, err = orderCollection.DeleteOne(context.Background(), bson.M{"_id": objectID})
+	update := bson.M{"$set": bson.M{"status": "cancelled", "updatedAt": time.Now()}}
+	_, err = orderCollection.UpdateOne(context.Background(), bson.M{"_id": objectID}, update)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to cancel order"})
 		return
