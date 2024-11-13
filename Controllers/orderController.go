@@ -2,6 +2,7 @@ package Controllers
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"Server/Middleware"
@@ -125,6 +126,28 @@ func GetOrders(c *gin.Context) {
 	}
 
 	c.JSON(200, orders)
+}
+
+func GetAllOrders(c *gin.Context) {
+	orderCollection := getOrderCollection()
+	var orders []Models.Order
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := orderCollection.Find(ctx, bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve orders"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &orders); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode orders"})
+		return
+	}
+
+	c.JSON(http.StatusOK, orders)
 }
 
 func CancelOrder(c *gin.Context) {
