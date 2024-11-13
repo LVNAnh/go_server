@@ -17,6 +17,9 @@ import (
 func getOrderCollection() *mongo.Collection {
 	return Database.Collection("product_order")
 }
+func getUserCollection() *mongo.Collection {
+	return Database.Collection("users")
+}
 
 func CreateOrder(c *gin.Context) {
 	claims := c.MustGet("user").(*Middleware.UserClaims)
@@ -130,6 +133,7 @@ func GetOrders(c *gin.Context) {
 
 func GetAllOrders(c *gin.Context) {
 	orderCollection := getOrderCollection()
+	userCollection := getUserCollection()
 	var orders []Models.Order
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -145,6 +149,16 @@ func GetAllOrders(c *gin.Context) {
 	if err = cursor.All(ctx, &orders); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode orders"})
 		return
+	}
+
+	for i, order := range orders {
+		var user Models.User
+		err := userCollection.FindOne(ctx, bson.M{"_id": order.UserID}).Decode(&user)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user data"})
+			return
+		}
+		orders[i].User = user
 	}
 
 	c.JSON(http.StatusOK, orders)

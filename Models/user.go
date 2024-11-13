@@ -64,6 +64,7 @@ type SelectedItem struct {
 type Order struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	UserID     primitive.ObjectID `bson:"user_id,omitempty" json:"user_id,omitempty"`
+	User       User               `bson:"-" json:"user,omitempty"`
 	Items      []OrderItem        `bson:"items,omitempty" json:"items,omitempty"`
 	TotalPrice float64            `bson:"total_price,omitempty" json:"total_price,omitempty"`
 	CreatedAt  time.Time          `bson:"created_at,omitempty" json:"created_at,omitempty"`
