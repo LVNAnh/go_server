@@ -62,7 +62,7 @@ func CreateOrder(c *gin.Context) {
 		UserID:     userID,
 		Items:      orderItems,
 		TotalPrice: totalPrice,
-		Status:     "pending", // Trạng thái mặc định là pending
+		Status:     "pending",
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
